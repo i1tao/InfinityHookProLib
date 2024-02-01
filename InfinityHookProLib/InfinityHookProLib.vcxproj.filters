@@ -24,16 +24,25 @@
     </Inf>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="InfinityHookProLib.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="InfinityHookProLib.cpp">
+    <ClCompile Include="InfinityHookProLib.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="EventTrace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\InfinityHookProLib.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="log.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EventTrace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
