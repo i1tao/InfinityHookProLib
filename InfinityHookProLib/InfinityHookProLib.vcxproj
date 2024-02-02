@@ -113,14 +113,17 @@
   <ItemGroup>
     <ClCompile Include="EventTrace.c" />
     <ClCompile Include="InfinityHookProLib.c" />
+    <ClCompile Include="Utils.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\InfinityHookProLib.h" />
+    <ClInclude Include="Defs.h" />
     <ClInclude Include="EventTrace.h" />
     <ClInclude Include="log.h" />
+    <ClInclude Include="Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -30,6 +30,9 @@
     <ClCompile Include="EventTrace.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -42,6 +45,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="EventTrace.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Defs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
