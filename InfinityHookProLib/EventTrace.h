@@ -57,6 +57,7 @@ typedef struct _EVENT_TRACE_PROPERTIES
     ULONG LoggerNameOffset;
 } EVENT_TRACE_PROPERTIES, * PEVENT_TRACE_PROPERTIES;
 #pragma warning(pop)
+
 typedef struct _CKCL_TRACE_PROPERIES
 {
     struct _EVENT_TRACE_PROPERTIES EventTraceProperties;

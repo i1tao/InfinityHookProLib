@@ -1,6 +1,6 @@
 #include "Utils.h"
 
-
+#include <intrin.h>
 #include <ntddk.h>
 #include <ntimage.h>
 
@@ -104,3 +104,36 @@ ULONG64 FindPatternImage(ULONG64 Address, const char* Pattern, const char* Mask,
 
     return 0;
 }
+
+ULONG64 GetImageSectionAddress(ULONG64 Address, const char* SectionName, PULONG Size)
+{
+    PIMAGE_DOS_HEADER DosHeader = (PIMAGE_DOS_HEADER)Address;
+    if (DosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    {
+        return 0;
+    }
+
+    PIMAGE_NT_HEADERS64 NtHeader = (PIMAGE_NT_HEADERS64)(Address + DosHeader->e_lfanew);
+    if (NtHeader->Signature != IMAGE_NT_SIGNATURE)
+    {
+        return 0;
+    }
+
+    PIMAGE_SECTION_HEADER SectionHeader = IMAGE_FIRST_SECTION(NtHeader);
+    for (USHORT i = 0; i < NtHeader->FileHeader.NumberOfSections; i++)
+    {
+        PIMAGE_SECTION_HEADER sec = &SectionHeader[i];
+
+        if (strstr((const char*)sec->Name, SectionName))
+        {
+            if (Size)
+            {
+                *Size = sec->SizeOfRawData;
+            }
+            return (ULONG64)sec + sec->VirtualAddress;
+        }
+    }
+
+    return 0;
+}
+

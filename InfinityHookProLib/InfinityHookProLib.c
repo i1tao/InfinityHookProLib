@@ -14,9 +14,10 @@ NTSTATUS IHookProInitialize()
     //
     // Init the array of hook functions
     //
-    g_IHookProContext.InitFlg = FALSE;
-    g_IHookProContext.HookedFunNum = 0;
-    RtlZeroMemory(g_IHookProContext.lstHook, sizeof(IHookFunc) * IHOOKPRO_MAX_HOOK_NUM);
+    IHookProContext* ctx = &g_IHookProContext;
+    ctx->InitFlg = FALSE;
+    ctx->HookedFunNum = 0;
+    RtlZeroMemory(ctx->lstHook, sizeof(IHookFunc) * IHOOKPRO_MAX_HOOK_NUM);
 
     //
     // Check if the "Circular Kernel Context Logger" session has been started.
@@ -39,30 +40,30 @@ NTSTATUS IHookProInitialize()
 
     RTL_OSVERSIONINFOW os;
     RtlGetVersion(&os);
-    g_IHookProContext.BuildNumber = os.dwBuildNumber;
-    g_IHookProContext.NtoskrnlBase = GetModuleAddress("ntoskrnl.exe", NULL);
+    ctx->BuildNumber = os.dwBuildNumber;
+    ctx->NtoskrnlBase = GetModuleAddress("ntoskrnl.exe", NULL);
 
-    if (!g_IHookProContext.NtoskrnlBase)
+    if (!ctx->NtoskrnlBase)
     {
         LOG_ERROR("Can't get ntoskrnl.exe base");
         return FALSE;
     }
 
-    LOG_INFO("System BuildNumber is <%d>. Ntoskrnl address is <0x%llX> \n", os.dwBuildNumber, g_IHookProContext.NtoskrnlBase);
+    LOG_INFO("System BuildNumber is <%d>. Ntoskrnl address is <0x%llX> \n", os.dwBuildNumber, ctx->NtoskrnlBase);
 
     //
     // EtwpDebuggerData -> EtwpDebuggerDataSilo -> CkclWmiLoggerContext.
     // If not, start the session.
     //
-    ULONG64 EtwpDebuggerData = FindPatternImage(g_IHookProContext.NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".text");
+    ULONG64 EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".text");
     if (!EtwpDebuggerData)
     {
-        EtwpDebuggerData = FindPatternImage(g_IHookProContext.NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".data");
+        EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".data");
     }
 
     if (!EtwpDebuggerData)
     {
-        EtwpDebuggerData = FindPatternImage(g_IHookProContext.NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".rdata");
+        EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".rdata");
     }
 
     if (!EtwpDebuggerData)
@@ -72,7 +73,43 @@ NTSTATUS IHookProInitialize()
     }
     LOG_INFO("Find etwp debugger data <0x%llX> .", EtwpDebuggerData);
 
+    //
+    // Find EtwpDebuggerDataSilo.
+    //
+    ctx->EtwpDebuggerDataSilo = *(void***)((ULONG64)EtwpDebuggerData + 0x10);
+    LOG_INFO("Etwp debugger data silo is <0x%p> \n", ctx->EtwpDebuggerDataSilo);
+    if (!ctx->EtwpDebuggerDataSilo)
+    {
+        return false;
+    }
 
+    //
+    // Find CkclWmiLoggerContext.
+    //
+    ctx->CkclWmiLoggerContext = ctx->EtwpDebuggerDataSilo[0x2];
+    LOG_INFO("Ckcl wmi logger context is <0x%p> \n", ctx->CkclWmiLoggerContext);
+    if (!ctx->CkclWmiLoggerContext)
+    {
+        return false;
+    }
+
+
+    if (ctx->BuildNumber <= 7601 || ctx->BuildNumber >= 22000)
+    {
+        // Win7 & Win11
+        ctx->GetCpuClock = (void**)((ULONG64)ctx->CkclWmiLoggerContext + 0x18);
+    } 
+    else
+    {
+        // Win8 -> Win10
+        ctx->GetCpuClock = (void**)((ULONG64)ctx->CkclWmiLoggerContext + 0x28); 
+    }
+
+    if (!MmIsAddressValid(ctx->GetCpuClock))
+    {
+        return false;
+    }
+    LOG_INFO("GetCpuClock is <0x%p> \n", *ctx->GetCpuClock);
 
     return TRUE;
 }

@@ -17,6 +17,11 @@ typedef struct _INFINITY_HOOK_PRO_CONTEXT
 
     ULONG       BuildNumber;
     ULONG64     NtoskrnlBase;
-    
+
+    //ULONG64     EtwpDebuggerData;
+    PVOID*      EtwpDebuggerDataSilo;
+    PVOID       CkclWmiLoggerContext;
+    PVOID*      GetCpuClock;
+    PVOID       SystemCallTable;
 }IHookProContext;
 

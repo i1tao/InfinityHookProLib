@@ -58,3 +58,5 @@ NTSTATUS NTAPI ZwQuerySystemInformation(
 ULONG64 GetModuleAddress(const char* Name, PULONG Size);
 
 ULONG64 FindPatternImage(ULONG64 Address, const char* Pattern, const char* Mask, const char* SectionName);
+
+PVOID GetSyscallEntry(ULONG64 NtBase);
