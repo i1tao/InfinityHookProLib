@@ -112,6 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="EventTrace.c" />
+    <ClCompile Include="hde\hde64.cpp" />
     <ClCompile Include="InfinityHookProLib.c" />
     <ClCompile Include="Utils.c" />
   </ItemGroup>
@@ -122,7 +123,10 @@
     <ClInclude Include="..\include\InfinityHookProLib.h" />
     <ClInclude Include="Defs.h" />
     <ClInclude Include="EventTrace.h" />
-    <ClInclude Include="log.h" />
+    <ClInclude Include="hde\hde64.h" />
+    <ClInclude Include="hde\pstdint.h" />
+    <ClInclude Include="hde\table64.h" />
+    <ClInclude Include="Log.h" />
     <ClInclude Include="Utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

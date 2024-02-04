@@ -3,7 +3,6 @@
 #include "EventTrace.h"
 #include "Defs.h"
 #include <ntddk.h>
-#include <stdbool.h>
 
 #include "Utils.h"
 
@@ -38,6 +37,9 @@ NTSTATUS IHookProInitialize()
         }
     }
 
+    //
+    // Get system build number to get some args that run hooking needed.
+    //
     RTL_OSVERSIONINFOW os;
     RtlGetVersion(&os);
     ctx->BuildNumber = os.dwBuildNumber;
@@ -49,7 +51,7 @@ NTSTATUS IHookProInitialize()
         return FALSE;
     }
 
-    LOG_INFO("System BuildNumber is <%d>. Ntoskrnl address is <0x%llX> \n", os.dwBuildNumber, ctx->NtoskrnlBase);
+    LOG_INFO("System BuildNumber is <%d>. Ntoskrnl address is <0x%llX>.", os.dwBuildNumber, ctx->NtoskrnlBase);
 
     //
     // EtwpDebuggerData -> EtwpDebuggerDataSilo -> CkclWmiLoggerContext.
@@ -71,45 +73,52 @@ NTSTATUS IHookProInitialize()
         LOG_ERROR("Find etwp data error.");
         return FALSE;
     }
-    LOG_INFO("Find etwp debugger data <0x%llX> .", EtwpDebuggerData);
+    LOG_INFO("Find etwp debugger data <0x%llX>.", EtwpDebuggerData);
 
     //
     // Find EtwpDebuggerDataSilo.
     //
     ctx->EtwpDebuggerDataSilo = *(void***)((ULONG64)EtwpDebuggerData + 0x10);
-    LOG_INFO("Etwp debugger data silo is <0x%p> \n", ctx->EtwpDebuggerDataSilo);
+    LOG_INFO("Etwp debugger data silo is <0x%p>.", ctx->EtwpDebuggerDataSilo);
     if (!ctx->EtwpDebuggerDataSilo)
     {
-        return false;
+        return FALSE;
     }
 
     //
     // Find CkclWmiLoggerContext.
     //
     ctx->CkclWmiLoggerContext = ctx->EtwpDebuggerDataSilo[0x2];
-    LOG_INFO("Ckcl wmi logger context is <0x%p> \n", ctx->CkclWmiLoggerContext);
+    LOG_INFO("Ckcl wmi logger context is <0x%p>.", ctx->CkclWmiLoggerContext);
     if (!ctx->CkclWmiLoggerContext)
     {
-        return false;
+        return FALSE;
     }
 
 
     if (ctx->BuildNumber <= 7601 || ctx->BuildNumber >= 22000)
     {
         // Win7 & Win11
-        ctx->GetCpuClock = (void**)((ULONG64)ctx->CkclWmiLoggerContext + 0x18);
+        ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x18);
     } 
     else
     {
         // Win8 -> Win10
-        ctx->GetCpuClock = (void**)((ULONG64)ctx->CkclWmiLoggerContext + 0x28); 
+        ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x28);
     }
 
     if (!MmIsAddressValid(ctx->GetCpuClock))
     {
-        return false;
+        return FALSE;
     }
-    LOG_INFO("GetCpuClock is <0x%p> \n", *ctx->GetCpuClock);
+    LOG_INFO("GetCpuClock is <0x%p>.", *ctx->GetCpuClock);
+
+    ctx->SystemCallTable = PAGE_ALIGN(GetSyscallEntry(ctx->NtoskrnlBase));
+    LOG_INFO("Syscall table is <0x%p>.", ctx->SystemCallTable);
+    if (!ctx->SystemCallTable)
+    {
+        return FALSE;
+    }
 
     return TRUE;
 }

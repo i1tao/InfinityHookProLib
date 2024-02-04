@@ -8,7 +8,7 @@ NTSTATUS EventTraceControl(ETWP_TRACE_TYPE Type)
     const unsigned long Tag = 'OTIL';
     GUID GuidCkclSession = { 0x54dea73a, 0xed1f, 0x42a4, { 0xaf, 0x71, 0x3e, 0x63, 0xd0, 0x56, 0xf1, 0x74 } };
 
-    CKCL_TRACE_PROPERTIES* Property = (CKCL_TRACE_PROPERTIES*)ExAllocatePool2(NonPagedPool, PAGE_SIZE, Tag);
+    CKCL_TRACE_PROPERTIES* Property = (CKCL_TRACE_PROPERTIES*)ExAllocatePoolWithTag(NonPagedPool, PAGE_SIZE, Tag);
     if (!Property)
     {
         LOG_ERROR("Allocate ckcl trace propertice struct failed \n");

@@ -4,6 +4,8 @@
 #include <ntddk.h>
 #include <ntimage.h>
 
+#include "hde/hde64.h"
+
 ULONG64 GetModuleAddress(const char* Name, unsigned long* Size)
 {
     ULONG64 Result = 0;
@@ -17,7 +19,7 @@ ULONG64 GetModuleAddress(const char* Name, unsigned long* Size)
         return Result;
     }
 
-    PSYSTEM_MODULE_INFORMATION SystemModules = (PSYSTEM_MODULE_INFORMATION)ExAllocatePool2(NonPagedPool, Length, Tag);
+    PSYSTEM_MODULE_INFORMATION SystemModules = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, Length, Tag);
     if (!SystemModules)
     {
         return Result;
@@ -137,3 +139,50 @@ ULONG64 GetImageSectionAddress(ULONG64 Address, const char* SectionName, PULONG 
     return 0;
 }
 
+PVOID GetSyscallEntry(ULONG64 NtBase)
+{
+    if (!NtBase)
+    {
+        return NULL;
+    }
+
+#define IA32_LSTAR_MSR 0xC0000082
+    PVOID SysCallEntry = (PVOID)__readmsr(IA32_LSTAR_MSR);
+
+    ULONG SecionSize = 0;
+    ULONG64 pKVASCODE = GetImageSectionAddress(NtBase, "KVASCODE", &SecionSize);
+    if (!pKVASCODE)
+    {
+        return SysCallEntry;
+    }
+
+    if (!(SysCallEntry >= (PVOID)pKVASCODE && SysCallEntry < (PVOID)(pKVASCODE + SecionSize)))
+    {
+        return SysCallEntry;
+    }
+
+    hde64s hdeInfo = {0};
+    for (char* pKiSystemServiceUser = (char*)SysCallEntry; ; pKiSystemServiceUser += hdeInfo.len)
+    {
+        if (!hde64_disasm(pKiSystemServiceUser, &hdeInfo))
+        {
+            break;
+        }
+
+        if (hdeInfo.opcode != 0xE9)
+        {
+            continue;
+        }
+
+        PVOID pPossibleSyscallEntry = (PVOID)((ULONG64)pKiSystemServiceUser + (int)hdeInfo.len + (int)hdeInfo.imm.imm32);
+        if (pPossibleSyscallEntry >= (PVOID)pKVASCODE && pPossibleSyscallEntry < (PVOID)((ULONG64)pKVASCODE + SecionSize))
+        {
+            continue;
+        }
+
+        SysCallEntry = pPossibleSyscallEntry;
+        break;
+    }
+
+    return SysCallEntry;
+}
