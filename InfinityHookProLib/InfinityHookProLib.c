@@ -1,10 +1,17 @@
+#define HALP_PERFORMANCE_COUNTER_TYPE_OFFSET (0xE4)
+#define HALP_PERFORMANCE_COUNTER_BASE_RATE_OFFSET (0xC0)
+#define HALP_PERFORMANCE_COUNTER_TYPE_PHYSICAL_MACHINE  (0x5)
+#define HALP_PERFORMANCE_COUNTER_BASE_RATE (10000000i64) 
+
+#pragma warning(disable: 4996)
+
 #include "../include/InfinityHookProLib.h"
 #include "log.h"
 #include "EventTrace.h"
 #include "Defs.h"
-#include <ntddk.h>
-
 #include "Utils.h"
+#include "IHookFunctions.h"
+#include <ntddk.h>
 
 IHookProContext g_IHookProContext = { 0 };
 
@@ -95,12 +102,14 @@ NTSTATUS IHookProInitialize()
         return FALSE;
     }
 
-
+    //
+    // Find GetCpuClock.
+    //
     if (ctx->BuildNumber <= 7601 || ctx->BuildNumber >= 22000)
     {
         // Win7 & Win11
         ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x18);
-    } 
+    }
     else
     {
         // Win8 -> Win10
@@ -113,6 +122,9 @@ NTSTATUS IHookProInitialize()
     }
     LOG_INFO("GetCpuClock is <0x%p>.", *ctx->GetCpuClock);
 
+    //
+    // Find SSDT entry.
+    //
     ctx->SystemCallTable = PAGE_ALIGN(GetSyscallEntry(ctx->NtoskrnlBase));
     LOG_INFO("Syscall table is <0x%p>.", ctx->SystemCallTable);
     if (!ctx->SystemCallTable)
@@ -120,6 +132,176 @@ NTSTATUS IHookProInitialize()
         return FALSE;
     }
 
+    if (ctx->BuildNumber <= 18363)
+    {
+        ctx->InitFlg = TRUE;
+        return TRUE;
+    }
+
+    //
+    // Find misc data that hook used.
+    //
+
+    ULONG64 RefHvlpReferenceTscPageAddress = FindPatternImage(
+        ctx->NtoskrnlBase,
+        "\x48\x8b\x05\x00\x00\x00\x00\x48\x8b\x40\x00\x48\x8b\x0d\x00\x00\x00\x00\x48\xf7\xe2",
+        "xxx????xxx?xxx????xxx",
+        ".text");
+    if (!RefHvlpReferenceTscPageAddress)
+    {
+        LOG_INFO("Find HvlpReferenceTscPage Failed!");
+        return FALSE;
+    }
+
+    ctx->HvlpReferenceTscPage = (char*)(RefHvlpReferenceTscPageAddress)+7 + *(int*)((char*)RefHvlpReferenceTscPageAddress + 3);
+    LOG_INFO("HvlpReferenceTscPage is <0x%llX>.", ctx->HvlpReferenceTscPage);
+    if (!ctx->HvlpReferenceTscPage)
+    {
+        return FALSE;
+    }
+
+    LOG_INFO("HvlpReferenceTscPage Value is <0x%llX>.", *(PULONG64)(ctx->HvlpReferenceTscPage));
+
+    //
+    // Find HvlGetQpcBias.
+    //
+    ULONG64 RefHvlGetQpcBiasAddress = FindPatternImage(
+        ctx->NtoskrnlBase,
+        "\x48\x8b\x05\x00\x00\x00\x00\x48\x85\xc0\x74\x00\x48\x83\x3d\x00\x00\x00\x00\x00\x74", // before Win10 22H2 & before Win11 22621
+        "xxx????xxxx?xxx?????x",
+        ".text");
+
+    if (!RefHvlGetQpcBiasAddress)
+    {
+        //All of these feature codes are present.
+        RefHvlGetQpcBiasAddress = FindPatternImage(
+            ctx->NtoskrnlBase,
+            "\x48\x8b\x05\x00\x00\x00\x00\xe8\x00\x00\x00\x00\x48\x03\xd8\x48\x89\x1f",
+            "xxx????x????xxxxxx",
+            ".text");
+        if (!RefHvlGetQpcBiasAddress)
+        {
+            LOG_ERROR("Find HvlGetQpcBias Failed!");
+            return FALSE;
+        }
+    }
+
+    ctx->HvlGetQpcBias = (char*)(RefHvlGetQpcBiasAddress)+7 + *(int*)((char*)RefHvlGetQpcBiasAddress + 3);
+
+    LOG_INFO("HvlGetQpcBias is <0x%llX>.", ctx->HvlGetQpcBias);
+    if (!ctx->HvlpReferenceTscPage)
+    {
+        return FALSE;
+    }
+    LOG_INFO("[%s] HvlGetQpcBias Value Is <0x%llX>.", __FUNCTION__, *(PULONG64)ctx->HvlGetQpcBias);
+
+    //
+    // Find HvlpGetReferenceTimeUsingTscPage.
+    //
+    ULONG64 RefHvlpGetReferenceTimeUsingTscPageAddress = FindPatternImage(
+        ctx->NtoskrnlBase,
+        "\x48\x8b\x05\x00\x00\x00\x00\x48\x85\xc0\x74\x00\x33\xc9\xe8\x00\x00\x00\x00\x48\x8b\xd8",  //Win10 22H2 & Win11 22621
+        "xxx????xxxx?xxx????xxx",
+        ".text");
+    if (!RefHvlpGetReferenceTimeUsingTscPageAddress)
+    {
+        RefHvlpGetReferenceTimeUsingTscPageAddress = FindPatternImage(
+            ctx->NtoskrnlBase,
+            "\x48\x8b\x05\x00\x00\x00\x00\xE8\x00\x00\x00\x00\x48\x03\xd8",
+            "xxx????x????xxx",
+            ".text");
+    }
+    if (!RefHvlpGetReferenceTimeUsingTscPageAddress)
+    {
+        LOG_ERROR("Find HvlpGetReferenceTimeUsingTscPage Failed!");
+        return FALSE;
+    }
+    ctx->HvlpGetReferenceTimeUsingTscPage = (char*)(RefHvlpGetReferenceTimeUsingTscPageAddress) + 7 + *(int*)((char*)(RefHvlpGetReferenceTimeUsingTscPageAddress) + 3);
+    LOG_INFO("HvlGetReferenceTimeUsingTscPage is <0x%llX>.", ctx->HvlpGetReferenceTimeUsingTscPage);
+    if (!ctx->HvlpGetReferenceTimeUsingTscPage)
+    {
+        return FALSE;
+    }
+    
+    LOG_INFO("HvlGetReferenceTimeUsingTscPage value is <0x%llX>.", *(PULONG64)(ctx->HvlpGetReferenceTimeUsingTscPage));
+
+    //
+    // Find HalpPerformanceCounter.
+    //
+    ULONG64 RefHalpPerformanceCounterAddress = FindPatternImage(
+        ctx->NtoskrnlBase,
+        "\x48\x8b\x05\x00\x00\x00\x00\x48\x8b\xf9\x48\x85\xc0\x74\x00\x83\xb8",
+        "xxx????xxxxxxx?xx",
+        ".text");
+    if (!RefHalpPerformanceCounterAddress)
+    {
+        LOG_ERROR("Find HalpPerformanceCounter Failed! ");
+        return FALSE;
+    }
+
+    ctx->HalpPerformanceCounter = (char*)(RefHalpPerformanceCounterAddress)+7 + *(int*)((char*)RefHalpPerformanceCounterAddress + 3);
+    LOG_INFO("HalpPerformanceCounter is <0x%llX>.", ctx->HalpPerformanceCounter);
+    if (!ctx->HvlpReferenceTscPage)
+    {
+        return FALSE;
+    }
+    LOG_INFO("HalpPerformanceCounter Value is <0x%llX>.", *(PULONG64)(ctx->HalpPerformanceCounter));
+
+    ULONG64  RefHalpOriginalPerformanceCounterAddress = FindPatternImage(
+        ctx->NtoskrnlBase,
+        "\x48\x8b\x05\x00\x00\x00\x00\x48\x3b\x00\x0f\x85\x00\x00\x00\x00\xA0",
+        "xxx????xx?xx????x",
+        ".text");
+    if (!RefHalpOriginalPerformanceCounterAddress)
+    {
+        RefHalpOriginalPerformanceCounterAddress = FindPatternImage(
+            ctx->NtoskrnlBase,
+            "\x48\x8b\x0d\x00\x00\x00\x00\x4c\x00\x00\x00\x00\x48\x3b\xf1",
+            "xxx????x????xxx",
+            ".text");
+        if (!RefHalpOriginalPerformanceCounterAddress)
+        {
+            LOG_ERROR("Find HalpOriginalPerformanceCounter Failed!");
+            return FALSE;
+        }
+    }
+
+    ctx->HalpOriginalPerformanceCounter = ((char*)RefHalpOriginalPerformanceCounterAddress + 7) + *(int*)((char*)RefHalpOriginalPerformanceCounterAddress + 3);
+    LOG_INFO("HalpOriginalPerformanceCounter is <0x%llX>.", ctx->HalpOriginalPerformanceCounter);
+    if (!ctx->HalpOriginalPerformanceCounter)
+    {
+        return FALSE;
+    }
+    LOG_INFO("HalpOriginalPerformanceCounter value is <0x%llX>.", *(PULONG64)(ctx->HalpOriginalPerformanceCounter));
+
+    ctx->HalpPerformanceCounterType = (ULONG*)((ULONG_PTR)(*(PVOID*)ctx->HalpPerformanceCounter) + HALP_PERFORMANCE_COUNTER_TYPE_OFFSET);
+    if (!ctx->HalpPerformanceCounterType)
+    {
+        LOG_ERROR("m_HalpPerformanceCounterType is Null!");
+        return FALSE;
+    }
+
+    // Is the physical machine?
+    if (*ctx->HalpPerformanceCounterType == HALP_PERFORMANCE_COUNTER_TYPE_PHYSICAL_MACHINE)
+    {
+        ctx->VmHalpPerformanceCounterType = *((char*)RefHalpPerformanceCounterAddress + 21);
+        LOG_INFO("HalpPerformanceCounterType In Virtual Machine Value is <0x%x>.", ctx->VmHalpPerformanceCounterType);
+
+        ctx->HalpOriginalPerformanceCounterCopy = ExAllocatePool(NonPagedPool, 0xFF);
+        if (!ctx->HalpOriginalPerformanceCounterCopy)
+        {
+            LOG_ERROR("Allocate HalpOriginalPerformanceCounterCopy Failed!");
+            return FALSE;
+        }
+
+        RtlZeroMemory((PVOID)ctx->HalpOriginalPerformanceCounterCopy, 0xFF);
+
+        *(PULONGLONG)((ULONG64)ctx->HalpOriginalPerformanceCounterCopy + HALP_PERFORMANCE_COUNTER_BASE_RATE_OFFSET) = HALP_PERFORMANCE_COUNTER_BASE_RATE;
+        *(PULONG)((ULONG64)ctx->HalpOriginalPerformanceCounterCopy + HALP_PERFORMANCE_COUNTER_TYPE_OFFSET) = HALP_PERFORMANCE_COUNTER_TYPE_PHYSICAL_MACHINE;
+        LOG_INFO("HalpOriginalPerformanceCounterCopy£º<0x%llX>.", ctx->HalpOriginalPerformanceCounterCopy);
+    }
+
+    ctx->InitFlg = TRUE;
     return TRUE;
 }
 
@@ -128,9 +310,11 @@ BOOLEAN IHookProAddHookFunction(PCHAR FuncName, PVOID FakeFuncAddr)
     ANSI_STRING as = RTL_CONSTANT_STRING(FuncName);
     UNICODE_STRING us;
 
-    if (!g_IHookProContext.InitFlg)
+    IHookProContext* ctx = &g_IHookProContext;
+
+    if (!ctx->InitFlg)
     {
-        LOG_ERROR("Does't Initialize.");
+        LOG_ERROR("Dont Initialize.");
         return FALSE;
     }
 
@@ -143,12 +327,12 @@ BOOLEAN IHookProAddHookFunction(PCHAR FuncName, PVOID FakeFuncAddr)
         return FALSE;
     }
 
-    g_IHookProContext.lstHook[g_IHookProContext.HookedFunNum].FakeFuncAddr = FakeFuncAddr;
-    g_IHookProContext.lstHook[g_IHookProContext.HookedFunNum].OriginalAddr = OriginalAddr;
-    g_IHookProContext.HookedFunNum++;
+    ctx->lstHook[ctx->HookedFunNum].FakeFuncAddr = FakeFuncAddr;
+    ctx->lstHook[ctx->HookedFunNum].OriginalAddr = OriginalAddr;
+    ctx->HookedFunNum++;
 
     LOG_INFO("Hook function <id:%d> name:<%Ws> Origin Addr:<0x%p> Fake Addr:<0x%p>. ",
-        g_IHookProContext.HookedFunNum - 1,
+        ctx->HookedFunNum - 1,
         us,
         OriginalAddr,
         FakeFuncAddr);
@@ -158,6 +342,29 @@ BOOLEAN IHookProAddHookFunction(PCHAR FuncName, PVOID FakeFuncAddr)
 
 BOOLEAN IHookProStart()
 {
+    IHookProContext* ctx = &g_IHookProContext;
+
+    if (!MmIsAddressValid(ctx->GetCpuClock))
+    {
+        LOG_ERROR("GetCpuClock address vaild.");
+        return FALSE;
+    }
+
+    ctx->OriginalGetCpuClockValue = (ULONG64)(*ctx->GetCpuClock);
+
+    if (ctx->BuildNumber <= 18363) // win 7 -> win10 1909
+    {
+        LOG_INFO("GetCpuClock Is 0x%p", *ctx->GetCpuClock);
+        *ctx->GetCpuClock = (PVOID)FakeGetCpuClock;                // replace function.
+        LOG_INFO("Update GetCpuClock Is 0x%p", *ctx->GetCpuClock);
+    }
+    else
+    {
+        *ctx->GetCpuClock = (PVOID)2;
+        LOG_INFO("Update GetCpuClock Is 0x%p", *ctx->GetCpuClock);
+
+        ctx->OriginalHvlGetQpcBias = (pfnHvlGetQpcBias)(*((PULONG64)ctx->HvlGetQpcBias));
+    }
     return TRUE;
 }
 

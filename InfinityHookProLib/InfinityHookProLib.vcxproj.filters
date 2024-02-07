@@ -30,6 +30,9 @@
     <ClCompile Include="hde\hde64.cpp">
       <Filter>src\hde</Filter>
     </ClCompile>
+    <ClCompile Include="IHookFunctions.c">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -58,6 +61,9 @@
     </ClInclude>
     <ClInclude Include="hde\table64.h">
       <Filter>src\hde</Filter>
+    </ClInclude>
+    <ClInclude Include="IHookFunctions.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
