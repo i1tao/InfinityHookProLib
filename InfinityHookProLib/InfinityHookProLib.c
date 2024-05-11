@@ -13,7 +13,7 @@
 #include "IHookFunctions.h"
 #include <ntddk.h>
 
-IHookProContext g_IHookProContext = { 0 };
+IHookProContext g_IHookProContext;
 
 NTSTATUS IHookProInitialize()
 {
@@ -23,7 +23,7 @@ NTSTATUS IHookProInitialize()
     IHookProContext* ctx = &g_IHookProContext;
     ctx->InitFlg = FALSE;
     ctx->HookedFunNum = 0;
-    RtlZeroMemory(ctx->lstHook, sizeof(IHookFunc) * IHOOKPRO_MAX_HOOK_NUM);
+    RtlZeroMemory(ctx->lstHook, sizeof(IHookFunc) * 256);
 
     //
     // Check if the "Circular Kernel Context Logger" session has been started.
@@ -31,17 +31,22 @@ NTSTATUS IHookProInitialize()
     //
     if (!NT_SUCCESS(EventTraceControl(EtwpUpdateTrace)))
     {
+        LOG_INFO("The ckcl doesn't start, now try to start it...");
         if (!NT_SUCCESS(EventTraceControl(EtwpStartTrace)))
         {
-            LOG_ERROR("Start ckcl failed");
+            LOG_ERROR("Start ckcl failed.");
             return FALSE;
         }
 
         if (!NT_SUCCESS(EventTraceControl(EtwpUpdateTrace)))
         {
-            LOG_ERROR("Update ckcl failed");
+            LOG_ERROR("Update ckcl failed.");
             return FALSE;
         }
+    }
+    else
+    {
+        LOG_INFO("The ckcl already has been started.");
     }
 
     //
@@ -54,7 +59,7 @@ NTSTATUS IHookProInitialize()
 
     if (!ctx->NtoskrnlBase)
     {
-        LOG_ERROR("Can't get ntoskrnl.exe base");
+        LOG_ERROR("Can't get ntoskrnl.exe base.");
         return FALSE;
     }
 
@@ -64,15 +69,16 @@ NTSTATUS IHookProInitialize()
     // EtwpDebuggerData -> EtwpDebuggerDataSilo -> CkclWmiLoggerContext.
     // If not, start the session.
     //
-    ULONG64 EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".text");
-    if (!EtwpDebuggerData)
-    {
-        EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".data");
-    }
+    ULONG64 EtwpDebuggerData = 0;
+    const char* memorySegments[] = { ".text", ".data", ".rdata" };
 
-    if (!EtwpDebuggerData)
+    for (size_t i = 0; i < sizeof(memorySegments) / sizeof(memorySegments[0]); i++)
     {
-        EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", ".rdata");
+        EtwpDebuggerData = FindPatternImage(ctx->NtoskrnlBase, "\x00\x00\x2c\x08\x04\x38\x0c", "??xxxxx", memorySegments[i]);
+        if (EtwpDebuggerData)
+        {
+            break;
+        }
     }
 
     if (!EtwpDebuggerData)
@@ -80,6 +86,7 @@ NTSTATUS IHookProInitialize()
         LOG_ERROR("Find etwp data error.");
         return FALSE;
     }
+
     LOG_INFO("Find etwp debugger data <0x%llX>.", EtwpDebuggerData);
 
     //
@@ -104,16 +111,13 @@ NTSTATUS IHookProInitialize()
 
     //
     // Find GetCpuClock.
+    // when ctx->BuildNumber <= 7601 or ctx->BuildNumber >= 22000  GetCpuClock = CkclWmiLoggerContext + 0x18.
     //
+    ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x28);
     if (ctx->BuildNumber <= 7601 || ctx->BuildNumber >= 22000)
     {
         // Win7 & Win11
-        ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x18);
-    }
-    else
-    {
-        // Win8 -> Win10
-        ctx->GetCpuClock = (PVOID*)((ULONG64)ctx->CkclWmiLoggerContext + 0x28);
+        ctx->GetCpuClock -= 2;
     }
 
     if (!MmIsAddressValid(ctx->GetCpuClock))
@@ -141,19 +145,18 @@ NTSTATUS IHookProInitialize()
     //
     // Find misc data that hook used.
     //
-
     ULONG64 RefHvlpReferenceTscPageAddress = FindPatternImage(
         ctx->NtoskrnlBase,
         "\x48\x8b\x05\x00\x00\x00\x00\x48\x8b\x40\x00\x48\x8b\x0d\x00\x00\x00\x00\x48\xf7\xe2",
         "xxx????xxx?xxx????xxx",
         ".text");
+    LOG_INFO("HvlpReferenceTscPage is <0x%llX>.", ctx->HvlpReferenceTscPage);
     if (!RefHvlpReferenceTscPageAddress)
     {
-        LOG_INFO("Find HvlpReferenceTscPage Failed!");
         return FALSE;
     }
 
-    ctx->HvlpReferenceTscPage = (char*)(RefHvlpReferenceTscPageAddress)+7 + *(int*)((char*)RefHvlpReferenceTscPageAddress + 3);
+    ctx->HvlpReferenceTscPage = ((char*)(RefHvlpReferenceTscPageAddress)+7) + *(int*)((char*)RefHvlpReferenceTscPageAddress + 3);
     LOG_INFO("HvlpReferenceTscPage is <0x%llX>.", ctx->HvlpReferenceTscPage);
     if (!ctx->HvlpReferenceTscPage)
     {
@@ -216,13 +219,14 @@ NTSTATUS IHookProInitialize()
         LOG_ERROR("Find HvlpGetReferenceTimeUsingTscPage Failed!");
         return FALSE;
     }
-    ctx->HvlpGetReferenceTimeUsingTscPage = (char*)(RefHvlpGetReferenceTimeUsingTscPageAddress) + 7 + *(int*)((char*)(RefHvlpGetReferenceTimeUsingTscPageAddress) + 3);
+
+    ctx->HvlpGetReferenceTimeUsingTscPage = (char*)(RefHvlpGetReferenceTimeUsingTscPageAddress)+7 + *(int*)((char*)(RefHvlpGetReferenceTimeUsingTscPageAddress)+3);
     LOG_INFO("HvlGetReferenceTimeUsingTscPage is <0x%llX>.", ctx->HvlpGetReferenceTimeUsingTscPage);
     if (!ctx->HvlpGetReferenceTimeUsingTscPage)
     {
         return FALSE;
     }
-    
+
     LOG_INFO("HvlGetReferenceTimeUsingTscPage value is <0x%llX>.", *(PULONG64)(ctx->HvlpGetReferenceTimeUsingTscPage));
 
     //

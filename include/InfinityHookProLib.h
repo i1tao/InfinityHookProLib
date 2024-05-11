@@ -10,8 +10,6 @@ extern "C"
 {
 #endif
 
-#define IHOOKPRO_MAX_HOOK_NUM 20    // the number of hook function you want.
-
     NTSTATUS
         IHookProInitialize();
 

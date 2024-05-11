@@ -14,7 +14,7 @@ typedef struct _INFINITY_HOOK_PRO_CONTEXT
 {
     BOOLEAN     InitFlg;
     int         HookedFunNum;
-    IHookFunc   lstHook[0x100];
+    IHookFunc   lstHook[256];
 
     ULONG       BuildNumber;
     ULONG64     NtoskrnlBase;
