@@ -1,7 +1,5 @@
 #pragma once
 
-
-
 #include <ntdef.h>
 #pragma comment(lib, "InfinityHookProLib.lib")
 

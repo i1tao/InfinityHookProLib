@@ -87,12 +87,12 @@ NTSTATUS IHookProInitialize()
         return FALSE;
     }
 
-    LOG_INFO("Find etwp debugger data <0x%llX>.", EtwpDebuggerData);
+    LOG_INFO("Find etwp debugger data at <0x%llX>.", EtwpDebuggerData);
 
     //
     // Find EtwpDebuggerDataSilo.
     //
-    ctx->EtwpDebuggerDataSilo = *(void***)((ULONG64)EtwpDebuggerData + 0x10);
+    ctx->EtwpDebuggerDataSilo = *(void***)(EtwpDebuggerData + 0x10);
     LOG_INFO("Etwp debugger data silo is <0x%p>.", ctx->EtwpDebuggerDataSilo);
     if (!ctx->EtwpDebuggerDataSilo)
     {
@@ -163,7 +163,7 @@ NTSTATUS IHookProInitialize()
         return FALSE;
     }
 
-    LOG_INFO("HvlpReferenceTscPage Value is <0x%llX>.", *(PULONG64)(ctx->HvlpReferenceTscPage));
+    LOG_INFO("HvlpReferenceTscPage's Value is <0x%llX>.", *(PULONG64)(ctx->HvlpReferenceTscPage));
 
     //
     // Find HvlGetQpcBias.
@@ -354,7 +354,7 @@ BOOLEAN IHookProStart()
         return FALSE;
     }
 
-    ctx->OriginalGetCpuClockValue = (ULONG64)(*ctx->GetCpuClock);
+    ctx->OriginalGetCpuClockValue = (ULONG64)*ctx->GetCpuClock;
 
     if (ctx->BuildNumber <= 18363) // win 7 -> win10 1909
     {
@@ -369,6 +369,7 @@ BOOLEAN IHookProStart()
 
         ctx->OriginalHvlGetQpcBias = (pfnHvlGetQpcBias)(*((PULONG64)ctx->HvlGetQpcBias));
     }
+
     return TRUE;
 }
 
