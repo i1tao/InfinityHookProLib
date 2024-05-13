@@ -348,16 +348,11 @@ BOOLEAN IHookProStart()
 {
     IHookProContext* ctx = &g_IHookProContext;
 
-    if (!MmIsAddressValid(ctx->GetCpuClock))
-    {
-        LOG_ERROR("GetCpuClock address vaild.");
-        return FALSE;
-    }
-
     ctx->OriginalGetCpuClockValue = (ULONG64)*ctx->GetCpuClock;
 
-    if (ctx->BuildNumber <= 18363) // win 7 -> win10 1909
+    if (ctx->BuildNumber <= 18363) 
     {
+        // win 7 -> win10 1909
         LOG_INFO("GetCpuClock Is 0x%p", *ctx->GetCpuClock);
         *ctx->GetCpuClock = (PVOID)FakeGetCpuClock;                // replace function.
         LOG_INFO("Update GetCpuClock Is 0x%p", *ctx->GetCpuClock);
