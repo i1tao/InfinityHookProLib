@@ -189,7 +189,7 @@ NTSTATUS IHookProInitialize()
         }
     }
 
-    ctx->HvlGetQpcBias = (char*)(RefHvlGetQpcBiasAddress)+7 + *(int*)((char*)RefHvlGetQpcBiasAddress + 3);
+    ctx->HvlGetQpcBias = ((char*)(RefHvlGetQpcBiasAddress)+7) + *(int*)((char*)RefHvlGetQpcBiasAddress + 3);
 
     LOG_INFO("HvlGetQpcBias is <0x%llX>.", ctx->HvlGetQpcBias);
     if (!ctx->HvlpReferenceTscPage)
@@ -363,6 +363,8 @@ BOOLEAN IHookProStart()
         LOG_INFO("Update GetCpuClock Is 0x%p", *ctx->GetCpuClock);
 
         ctx->OriginalHvlGetQpcBias = (pfnHvlGetQpcBias)(*((PULONG64)ctx->HvlGetQpcBias));
+        ctx->HvlGetQpcBias = (PVOID)FakeHvlGetQpcBias;
+
     }
 
     return TRUE;

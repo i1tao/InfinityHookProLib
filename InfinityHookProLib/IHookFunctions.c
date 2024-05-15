@@ -81,6 +81,11 @@ ULONG64 FakeGetCpuClock()
     return __rdtsc();
 }
 
+ULONG64 FakeHvlGetQpcBias()
+{
+    return *((PULONG64)(*((PULONG64)g_IHookProContext.HvlpReferenceTscPage)) + 3);
+}
+
 
 
 void __fastcall InfinityCallback(unsigned long nCallIndex, PVOID* pSsdtAddress)
