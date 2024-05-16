@@ -374,7 +374,7 @@ BOOLEAN IHookProStop()
 {
     IHookProContext* ctx = &g_IHookProContext;
 
-    NTSTATUS result = NT_SUCCESS(EventTraceControl(EtwpStopTrace)) && NT_SUCCESS(EventTraceControl(EtwpStartTrace));
+    BOOLEAN result = NT_SUCCESS(EventTraceControl(EtwpStopTrace)) && NT_SUCCESS(EventTraceControl(EtwpStartTrace));
 
     if (ctx->BuildNumber > 18363)
     {
@@ -383,5 +383,4 @@ BOOLEAN IHookProStop()
     }
 
     return result;
-    return TRUE;
 }
