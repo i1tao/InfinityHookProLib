@@ -372,5 +372,16 @@ BOOLEAN IHookProStart()
 
 BOOLEAN IHookProStop()
 {
+    IHookProContext* ctx = &g_IHookProContext;
+
+    NTSTATUS result = NT_SUCCESS(EventTraceControl(EtwpStopTrace)) && NT_SUCCESS(EventTraceControl(EtwpStartTrace));
+
+    if (ctx->BuildNumber > 18363)
+    {
+        *((PULONG64)ctx->HvlGetQpcBias) = (ULONG64)ctx->OriginalHvlGetQpcBias;
+        *ctx->GetCpuClock = (void*)ctx->OriginalGetCpuClockValue;
+    }
+
+    return result;
     return TRUE;
 }
