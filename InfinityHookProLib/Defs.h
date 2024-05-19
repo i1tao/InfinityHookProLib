@@ -9,7 +9,6 @@ typedef struct _INF_HOOK_FUNC
     PVOID FakeFuncAddr;
 }IHookFunc;
 
-
 typedef struct _INFINITY_HOOK_PRO_CONTEXT
 {
     BOOLEAN     InitFlg;

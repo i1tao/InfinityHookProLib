@@ -1,7 +1,6 @@
 #pragma once
 #include <ntdef.h>
 
-
 typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemBasicInformation = 0,
     SystemProcessorInformation = 1,

@@ -361,10 +361,8 @@ BOOLEAN IHookProStart()
     {
         *ctx->GetCpuClock = (PVOID)2;
         LOG_INFO("Update GetCpuClock Is 0x%p", *ctx->GetCpuClock);
-
         ctx->OriginalHvlGetQpcBias = (pfnHvlGetQpcBias)(*((PULONG64)ctx->HvlGetQpcBias));
         ctx->HvlGetQpcBias = (PVOID)FakeHvlGetQpcBias;
-
     }
 
     return TRUE;
@@ -373,7 +371,6 @@ BOOLEAN IHookProStart()
 BOOLEAN IHookProStop()
 {
     IHookProContext* ctx = &g_IHookProContext;
-
     BOOLEAN result = NT_SUCCESS(EventTraceControl(EtwpStopTrace)) && NT_SUCCESS(EventTraceControl(EtwpStartTrace));
 
     if (ctx->BuildNumber > 18363)

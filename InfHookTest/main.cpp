@@ -7,6 +7,7 @@ extern "C" VOID
 Unload(_In_ struct _DRIVER_OBJECT* DriverObject)
 {
     UNREFERENCED_PARAMETER(DriverObject);
+    IHookProStop();
     return;
 }
 

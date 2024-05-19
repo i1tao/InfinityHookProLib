@@ -14,6 +14,7 @@ void __fastcall InfinityCallback(unsigned long nCallIndex, PVOID* pSsdtAddress);
 
 ULONG64 FakeGetCpuClock()
 {
+    // 
     if (ExGetPreviousMode() == KernelMode)
     {
         __rdtsc();
@@ -83,6 +84,7 @@ ULONG64 FakeGetCpuClock()
 
 ULONG64 FakeHvlGetQpcBias()
 {
+    FakeGetCpuClock();
     return *((PULONG64)(*((PULONG64)g_IHookProContext.HvlpReferenceTscPage)) + 3);
 }
 
@@ -90,7 +92,6 @@ ULONG64 FakeHvlGetQpcBias()
 
 void __fastcall InfinityCallback(unsigned long nCallIndex, PVOID* pSsdtAddress)
 {
-    // https://hfiref0x.github.io/
     UNREFERENCED_PARAMETER(nCallIndex);
     if (pSsdtAddress)
     {
