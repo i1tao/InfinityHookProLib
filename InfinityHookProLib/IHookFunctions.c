@@ -97,9 +97,9 @@ void __fastcall InfinityCallback(unsigned long nCallIndex, PVOID* pSsdtAddress)
     {
         for (int i = 0; i < g_IHookProContext.HookedFunNum; i++)
         {
-            if (*pSsdtAddress == g_IHookProContext.lstHook[i].OriginalAddr)
+            if (*pSsdtAddress == g_IHookProContext.HookFunctionLists[i].OriginalAddr)
             {
-                *pSsdtAddress = g_IHookProContext.lstHook[i].FakeFuncAddr;
+                *pSsdtAddress = g_IHookProContext.HookFunctionLists[i].FakeFuncAddr;
             }
         }
 

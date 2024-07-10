@@ -12,10 +12,10 @@ typedef struct _INF_HOOK_FUNC
 typedef struct _INFINITY_HOOK_PRO_CONTEXT
 {
     BOOLEAN     InitFlg;
-    int         HookedFunNum;
-    IHookFunc   lstHook[256];
+    ULONG64     HookedFunNum;
+    IHookFunc   HookFunctionLists[256];
 
-    ULONG       BuildNumber;
+    ULONG64     BuildNumber;
     ULONG64     NtoskrnlBase;
 
     //ULONG64     EtwpDebuggerData;

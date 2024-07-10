@@ -23,7 +23,7 @@ NTSTATUS IHookProInitialize()
     IHookProContext* ctx = &g_IHookProContext;
     ctx->InitFlg = FALSE;
     ctx->HookedFunNum = 0;
-    RtlZeroMemory(ctx->lstHook, sizeof(IHookFunc) * 256);
+    RtlZeroMemory(ctx->HookFunctionLists, sizeof(IHookFunc) * 256);
 
     //
     // Check if the "Circular Kernel Context Logger" session has been started.
@@ -331,8 +331,8 @@ BOOLEAN IHookProAddHookFunction(PCHAR FuncName, PVOID FakeFuncAddr)
         return FALSE;
     }
 
-    ctx->lstHook[ctx->HookedFunNum].FakeFuncAddr = FakeFuncAddr;
-    ctx->lstHook[ctx->HookedFunNum].OriginalAddr = OriginalAddr;
+    ctx->HookFunctionLists[ctx->HookedFunNum].FakeFuncAddr = FakeFuncAddr;
+    ctx->HookFunctionLists[ctx->HookedFunNum].OriginalAddr = OriginalAddr;
     ctx->HookedFunNum++;
 
     LOG_INFO("Hook function <id:%d> name:<%Ws> Origin Addr:<0x%p> Fake Addr:<0x%p>. ",
